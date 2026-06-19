@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K9 警衛輪班總管理系統 - 2024標準格式版</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root { --primary: #d32f2f; --bg: #f8f9fa; --border: #999; }
+        body { font-family: "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 15px; }
+        
+        .header-box { display: flex; justify-content: space-between; align-items: center; background: #fff; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        .month-ctrl { display: flex; align-items: center; gap: 15px; font-weight: bold; font-size: 1.3rem; }
+        .btn-nav { padding: 6px 15px; cursor: pointer; background: #eee; border: 1px solid #ccc; border-radius: 4px; }
+        
+        .table-container { width: 100%; overflow-x: auto; background: white; border: 1px solid #666; }
+        table { border-collapse: collapse; min-width: 2200px; width: 100%; table-layout: fixed; }
+        th, td { border: 1px solid var(--border); padding: 5px 2px; text-align: center; font-size: 14px; height: 35px; }
+        th { background: #e9ecef; }
+        
+        /* 固定左側欄位 */
+        .sticky-col { position: sticky; background: #fff !important; z-index: 10; border-right: 2px solid #666 !important; }
+        .col-group { left: 0; width: 60px; }
+        .col-shift { left: 60px; width: 90px; }
+        .col-id { left: 150px; width: 80px; }
+        .col-name { left: 230px; width: 80px; }
+
+        input { width: 95%; border: none; text-align: center; font-size: 13px; background: transparent; }
+        /* 唯讀模式下禁止聚焦，並在編輯模式下高亮輸入框 */
+        .can-edit input { background: #fff9c4; }
+
+        /* 符合照片標準的配色樣式 */
+        .is-holiday { color: red; font-weight: bold; }
+        .bg-例假 { background: #fce4ec !important; color: #c2185b; }
+        .bg-休息日 { background: #e8f5e9 !important; color: #2e7d32; }
+        .bg-國定假日 { background: #fff3e0 !important; color: #ef6c00; }
+        
+        /* 英文簡稱上色對應（D1/E2等） */
+        .bg-D1, .bg-E1, .bg-C1 { background: #fce4ec !important; color: #c2185b; }
+        .bg-D2, .bg-E2, .bg-C2 { background: #e8f5e9 !important; color: #2e7d32; }
+        .bg-D3, .bg-E3, .bg-C3 { background: #fff3e0 !important; color: #ef6c00; }
+
+        /* 底部備註欄 */
+        .footer-note { margin-top: 20px; background: #fff; padding: 20px; border: 1px solid #ccc; display: flex; gap: 50px; font-size: 14px; line-height: 1.6; }
+        .note-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; }
+
+        .lock-btn { padding: 10px 20px; border-radius: 4px; border: none; background: #607d8b; color: white; cursor: pointer; font-weight: bold; }
+        .lock-btn.unlocked { background: #43a047; }
+        .export-btn { padding: 10px 20px; border-radius: 4px; border: none; background: #1565c0; color: white; cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="header-box">
+    <div class="month-ctrl">
+        <button class="btn-nav" onclick="changeMonth(-1)">❮</button>
+        <span id="currentMonthDisplay">載入中...</span>
+        <button class="btn-nav" onclick="changeMonth(1)">❯</button>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <button id="lockBtn" class="lock-btn" onclick="toggleLock()">🔒 唯讀模式</button>
+        <button class="export-btn" onclick="exportMonthToExcel()">📊 匯出 Excel </button>
+    </div>
+</div>
+
+<div class="table-container">
+    <table id="rosterTable">
+        <thead>
+            <tr id="dateHeader"></tr>
+            <tr id="weekHeader"></tr>
+        </thead>
+        <tbody id="rosterBody"></tbody>
+    </table>
+</div>
+
+<div class="footer-note">
+    <div>
+        <div class="note-title">班別與時間：</div>
+        日班B班：07:00-19:00<br>
+        夜班E班：19:00-07:00<br>
+        夜班B班：17:00-05:00
+    </div>
+    <div>
+        <div class="note-title">代號說明：</div>
+        例假 (例假日) -> D1 / E1 / C1<br>
+        休息日 (休息日) -> D2 / E2 / C2<br>
+        國定假日 (國定假日) -> D3 / E3 / C3
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyB2_tKKsVT4kdW7PPkJgI9O7S1YdCWor48",
+        databaseURL: "https://factor-security-d1965-default-rtdb.firebaseio.com",
+        projectId: "factor-security-d1965",
+        appId: "1:864846943143:web:4cfa18cd20d2f712225c82"
+    };
+    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let curYear = 2024;
+    let curMonth = 2; // 預設 3 月 (JavaScript 的月份是 0-11)
+    let isEditing = false;
+
+    const staffData = [
+        {group: "總務", shift: "日班B班", id: "D0762", name: "盧家慶"},
+        {group: "總務", shift: "日班B班", id: "D03807", name: "何鴻隆"},
+        {group: "總務", shift: "日班B班", id: "D1079", name: "蔡易倫"},
+        {group: "總務", shift: "夜班E班", id: "D03806", name: "邱鴻鈞"},
+        {group: "總務", shift: "夜班E班", id: "D04132", name: "柳旭洲"},
+        {group: "總務", shift: "夜班B班", id: "D03733", name: "魏榮志"}
+    ];
+
+    const weekNames = ["日", "一", "二", "三", "四", "五", "六"];
+
+    function initTable() {
+        const dHead = document.getElementById('dateHeader');
+        const wHead = document.getElementById('weekHeader');
+        const tbody = document.getElementById('rosterBody');
+        
+        dHead.innerHTML = `<th class="sticky-col col-group">組別</th><th class="sticky-col col-shift">班別</th><th class="sticky-col col-id">員工代號</th><th class="sticky-col col-name">姓名</th>`;
+        wHead.innerHTML = `<th class="sticky-col col-group">-</th><th class="sticky-col col-shift">-</th><th class="sticky-col col-id">-</th><th class="sticky-col col-name">-</th>`;
+        tbody.innerHTML = '';
+        
+        document.getElementById('currentMonthDisplay').innerText = `${curYear} / ${String(curMonth + 1).padStart(2,'0')} 警衛輪班表`;
+        
+        const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dateTh = document.createElement('th');
+            dateTh.innerText = d;
+            dHead.appendChild(dateTh);
+            
+            const dayOfWeek = new Date(curYear, curMonth, d).getDay();
+            const weekTh = document.createElement('th');
+            weekTh.innerText = weekNames[dayOfWeek];
+            if(dayOfWeek === 0 || dayOfWeek === 6) weekTh.classList.add('is-holiday');
+            wHead.appendChild(weekTh);
+        }
+
+        staffData.forEach(p => {
+            const tr = document.createElement('tr');
+            let rowHtml = `
+                <td class="sticky-col col-group">${p.group}</td>
+                <td class="sticky-col col-shift">${p.shift}</td>
+                <td class="sticky-col col-id">${p.id}</td>
+                <td class="sticky-col col-name"><b>${p.name}</b></td>
+            `;
+            for (let d = 1; d <= daysInMonth; d++) {
+                // 初始化 input，預設帶入 readOnly 限制 Tab 鍵聚焦
+                rowHtml += `<td><input id="${curYear}_${curMonth+1}_${p.name}_${d}" onchange="saveShift('${p.name}', ${d}, this.value)" readOnly tabindex="-1"></td>`;
+            }
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
+        });
+
+        // 重新初始化輸入框的唯讀與 tabIndex 狀態
+        applyReadOnlyState();
+        listenToData(daysInMonth);
+    }
+
+    function listenToData(days) {
+        db.ref('guardSchedules').off();
+        db.ref('guardSchedules').on('value', (snapshot) => {
+            const data = snapshot.val() || {};
+            staffData.forEach(p => {
+                for (let d = 1; d <= days; d++) {
+                    const id = `${curYear}_${curMonth+1}_${p.name}_${d}`;
+                    const val = data[id] || "";
+                    const el = document.getElementById(id);
+                    if(el) {
+                        el.value = val;
+                        // 移除所有舊的上色 CSS
+                        el.parentElement.className = "";
+                        
+                        // 動態上色機制（相容中文與英文代號）
+                        if(val) {
+                            const formattedVal = val.replace(/[\(\)\s]/g, ""); // 移除括號與空白，避免 CSS 報錯
+                            el.parentElement.classList.add('bg-' + formattedVal);
+                        }
+                    }
+                }
+            });
+        });
+    }
+
+    function saveShift(name, day, val) {
+        if (!isEditing) return; // 二次防禦：非編輯狀態不允許寫入資料庫
+        const id = `${curYear}_${curMonth+1}_${name}_${day}`;
+        db.ref('guardSchedules/' + id).set(val);
+    }
+
+    function changeMonth(dir) {
+        curMonth += dir;
+        if (curMonth < 0) { curMonth = 11; curYear--; }
+        else if (curMonth > 11) { curMonth = 0; curYear++; }
+        initTable();
+    }
+
+    // 集中管理唯讀與可聚焦狀態，防禦鍵盤 Tab 修改
+    function applyReadOnlyState() {
+        const inputs = document.querySelectorAll('#rosterBody input');
+        inputs.forEach(input => {
+            if (isEditing) {
+                input.removeAttribute('readOnly');
+                input.removeAttribute('tabindex');
+            } else {
+                input.setAttribute('readOnly', 'true');
+                input.setAttribute('tabindex', '-1');
+            }
+        });
+    }
+
+    function toggleLock() {
+        if(!isEditing && prompt("管理密碼：") === "8888") {
+            isEditing = true;
+            document.body.classList.add('can-edit');
+            document.getElementById('lockBtn').innerText = "🔓 編輯中";
+            document.getElementById('lockBtn').classList.add('unlocked');
+        } else if(isEditing) {
+            isEditing = false;
+            document.body.classList.remove('can-edit');
+            document.getElementById('lockBtn').innerText = "🔒 唯讀模式";
+            document.getElementById('lockBtn').classList.remove('unlocked');
+        }
+        applyReadOnlyState(); // 切換鎖定時立刻套用狀態
+    }
+
+    async function exportMonthToExcel() {
+        const snapshot = await db.ref('guardSchedules').once('value');
+        const data = snapshot.val() || {};
+        const daysInMonth = new Date(curYear, curMonth + 1, 0).getDate();
+        
+        const rows = [];
+        const r1 = ['組別', '班別', '員工代號', '姓名'];
+        for(let d=1; d<=daysInMonth; d++) r1.push(d);
+        rows.push(r1);
+
+        const r2 = ['', '', '', ''];
+        for(let d=1; d<=daysInMonth; d++) r2.push(weekNames[new Date(curYear, curMonth, d).getDay()]);
+        rows.push(r2);
+
+        staffData.forEach(p => {
+            const row = [p.group, p.shift, p.id, p.name];
+            for(let d=1; d<=daysInMonth; d++) {
+                row.push(data[`${curYear}_${curMonth+1}_${p.name}_${d}`] || "");
+            }
+            rows.push(row);
+        });
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "警衛排班表");
+        XLSX.writeFile(wb, `警衛排班表_${curYear}_${curMonth+1}.xlsx`);
+    }
+
+    initTable();
+</script>
+</body>
+</html>
