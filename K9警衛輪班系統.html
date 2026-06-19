@@ -24,19 +24,40 @@
         }
         table { 
             border-collapse: collapse; 
-            min-width: 1900px; /* ── 縮回 1900px，讓你一邊看能看到更多天數 ── */
+            min-width: 1900px; /* ── 保持你最舒適的總寬度 ── */
             width: 100%; 
             table-layout: fixed; 
         }
         th, td { 
             border: 1px solid var(--border); 
-            padding: 5px 2px;  /* ── 恢復你原本習慣的內距，不佔空間 ── */
+            padding: 5px 1px;  /* ── 把左右邊距縮到最小(1px)，幫「國定假日」擠出更多空間 ── */
             text-align: center; 
             font-size: 14px; 
-            height: 42px;      /* ── 高度改成 42px，比原本 35px 好按，又不會太肥 ── */
+            height: 42px; 
+            white-space: nowrap;     /* ── 強制字體絕對不換行，維持在同一橫排 ── */
+            word-break: keep-all;
         }
         th { 
             background: #e9ecef; 
+        }
+
+        /* ── 柔的獨家大絕招：只要輸入框內的字數太多，就自動縮小字體 ── */
+        td input {
+            width: 100%;
+            height: 100%;
+            border: none;
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            background: transparent;
+            padding: 0;
+        }
+        
+        /* 當遇到4個字以上的長文字(如國定假日)時，自動調整合適感 */
+        td[class*="val-國定假日"] input,
+        td[class*="val-國定假"] input {
+            font-size: 11px !important; /* ── 四個字的時候字體自動縮小，完美裝進格肚子裡！ ── */
+            letter-spacing: -0.5px;     /* ── 讓字距緊湊一點點，看起來更精緻 ── */
         }
         
         .sticky-left { position: sticky; left: 0; background: #fff !important; z-index: 10; border-right: 2px solid #bbb !important; width: 50px; }
