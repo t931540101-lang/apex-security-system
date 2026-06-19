@@ -24,13 +24,7 @@
     table-layout: fixed; 
     border: 2px solid var(--border); 
 }
-        th, td { 
-    border: 1px solid var(--border); 
-    text-align: center; 
-    font-size: 15px;      /* 字體從 14 稍微放大到 15 */
-    height: 48px;         /* 高度從 38px 改大到 48px */
-    padding: 4px;         /* 內文加上一點點留白，字不會貼著邊框 */
-}
+        table { border-collapse: collapse; width: 100%; min-width: 1800px; table-layout: fixed; border: 2px solid var(--border); }
         th { background: #f8f9fa; position: sticky; top: 0; z-index: 2; }
         
         .sticky-left { position: sticky; left: 0; background: #fff !important; z-index: 10; border-right: 2px solid #bbb !important; width: 50px; }
