@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K9 警衛輪班系統 - 照片對應版</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        :root { --primary: #2c3e50; --border: #000; }
+        body { font-family: "Microsoft JhengHei", sans-serif; margin: 0; padding: 10px; background: #fff; }
+        
+        .header-box { display: flex; justify-content: space-between; padding: 10px; border-bottom: 2px solid #333; margin-bottom: 10px; }
+        
+        table { border-collapse: collapse; width: 100%; min-width: 1800px; table-layout: fixed; border: 2px solid var(--border); }
+        th, td { border: 1px solid var(--border); text-align: center; font-size: 14px; height: 38px; padding: 0; }
+        th { background: #f2f2f2; font-weight: bold; }
+
+        /* 左側固定欄位 */
+        .sticky { position: sticky; left: 0; background: #fff !important; z-index: 10; border-right: 2px solid #000 !important; }
+        .col-1 { left: 0; width: 60px; }
+        .col-2 { left: 60px; width: 100px; }
+        .col-3 { left: 160px; width: 90px; }
+        .col-4 { left: 250px; width: 90px; }
+
+        input { width: 100%; height: 100%; border: none; text-align: center; font-size: 14px; font-weight: bold; background: transparent; }
+        .can-edit input { background: #fffde7; cursor: text; }
+
+        /* 照片配色同步 */
+        .is-sun { color: red; }
+        .val-例假 { background: #d9d9d9; } /* 照片中例假是灰底 */
+        .val-休息日 { background: #fff; }
+        .val-日班B班 { color: #000; }
+    </style>
+</head>
+<body>
+
+<div class="header-box">
+    <div style="font-size: 1.5rem; font-weight: bold;" id="titleDisplay">2026年03月警衛輪班表</div>
+    <div>
+        <button onclick="changeMonth(-1)">上個月</button>
+        <button id="lockBtn" style="background: #607d8b; color: white; padding: 5px 15px;" onclick="toggleLock()">🔒 唯讀</button>
+        <button style="background: #1565c0; color: white; padding: 5px 15px;" onclick="exportExcel()">📊 匯出照片格式</button>
+        <button onclick="changeMonth(1)">下個月</button>
+    </div>
+</div>
+
+<div style="overflow-x: auto;">
+    <table>
+        <thead>
+            <tr id="dateH"></tr>
+            <tr id="weekH"></tr>
+        </thead>
+        <tbody id="mainBody"></tbody>
+    </table>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyB2_tKKsVT4kdW7PPkJgI9O7S1YdCWor48",
+        databaseURL: "https://factor-security-d1965-default-rtdb.firebaseio.com",
+        projectId: "factor-security-d1965",
+        appId: "1:864846943143:web:4cfa18cd20d2f712225c82"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let curYear = 2026, curMonth = 2, isEditing = false;
+    const weeks = ["日", "一", "二", "三", "四", "五", "六"];
+    
+    // 同步照片中的人員與代號
+    const staffs = [
+        {g: "總務", s: "日班B班", id: "D01762", n: "盧家慶"},
+        {g: "總務", s: "日班B班", id: "D03807", n: "何鴻隆"},
+        {g: "總務", s: "日班B班", id: "D01879", n: "柳旭洲"},
+        {g: "總務", s: "夜班E班", id: "D03806", n: "蔡易倫"},
+        {g: "總務", s: "夜班E班", id: "D04132", n: "邱鴻鈞"},
+        {g: "總務", s: "夜班E班", id: "D03733", n: "魏榮志"}
+    ];
+
+    function init() {
+        const dH = document.getElementById('dateH');
+        const wH = document.getElementById('weekH');
+        const body = document.getElementById('mainBody');
+        const days = new Date(curYear, curMonth + 1, 0).getDate();
+        
+        document.getElementById('titleDisplay').innerText = `${curYear}年${String(curMonth+1).padStart(2,'0')}月警衛輪班表`;
+
+        dH.innerHTML = `<th class="sticky col-1">組別</th><th class="sticky col-2">班別</th><th class="sticky col-3">員工代號</th><th class="sticky col-4">姓名</th>`;
+        wH.innerHTML = `<th class="sticky col-1">-</th><th class="sticky col-2">-</th><th class="sticky col-3">-</th><th class="sticky col-4">-</th>`;
+        
+        for(let d=1; d<=days; d++) {
+            const dateObj = new Date(curYear, curMonth, d);
+            const wName = weeks[dateObj.getDay()];
+            dH.innerHTML += `<th>${d}</th>`;
+            wH.innerHTML += `<th class="${wName==='日'?'is-sun':''}">${wName}</th>`;
+        }
+
+        body.innerHTML = "";
+        staffs.forEach(p => {
+            let row = `<tr><td class="sticky col-1">${p.g}</td><td class="sticky col-2">${p.s}</td><td class="sticky col-3">${p.id}</td><td class="sticky col-4">${p.n}</td>`;
+            for(let d=1; d<=days; d++) {
+                row += `<td><input id="key_${curYear}_${curMonth+1}_${p.n}_${d}" onchange="update('${p.n}',${d},this.value)"></td>`;
+            }
+            body.innerHTML += row + `</tr>`;
+        });
+        load();
+    }
+
+    function load() {
+        db.ref('guardSchedules').on('value', snap => {
+            const data = snap.val() || {};
+            const days = new Date(curYear, curMonth + 1, 0).getDate();
+            staffs.forEach(p => {
+                for(let d=1; d<=days; d++) {
+                    const k = `key_${curYear}_${curMonth+1}_${p.n}_${d}`;
+                    const val = data[k] || "";
+                    const input = document.getElementById(k);
+                    if(input) {
+                        input.value = val;
+                        input.parentElement.className = val ? `val-${val}` : "";
+                    }
+                }
+            });
+        });
+    }
+
+    function update(name, d, val) {
+        const k = `key_${curYear}_${curMonth+1}_${name}_${d}`;
+        db.ref('guardSchedules/' + k).set(val);
+    }
+
+    function toggleLock() {
+        if(!isEditing && prompt("密碼：")==="8888") {
+            isEditing = true; document.body.classList.add('can-edit');
+            document.getElementById('lockBtn').innerText = "🔓 編輯中";
+        } else {
+            isEditing = false; document.body.classList.remove('can-edit');
+            document.getElementById('lockBtn').innerText = "🔒 唯讀";
+        }
+    }
+
+    function changeMonth(v) { curMonth += v; if(curMonth<0){curMonth=11;curYear--;}else if(curMonth>11){curMonth=0;curYear++;} init(); }
+
+    init();
+</script>
+</body>
+</html>
