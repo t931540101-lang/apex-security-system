@@ -27,11 +27,37 @@
         input { width: 90%; border: none; text-align: center; font-weight: bold; background: transparent; pointer-events: none; }
         .can-edit input { pointer-events: auto; background: #fff9c4; border-radius: 3px; }
         
-        /* 班表代號配色 */
-        .val-D1, .val-D2, .val-D3 { color: #0d47a1; background: #e3f2fd; } /* 日班系列 */
-        .val-E1, .val-E2, .val-E3 { color: #4a148c; background: #f3e5f5; } /* 夜E班系列 */
-        .val-C1, .val-C2, .val-C3 { color: #1b5e20; background: #e8f5e9; } /* 夜B班系列 */
-        .val-休, .val-X { color: #d32f2f; background: #ffebee; }
+        /* 班表代號配色 - 1:1 同步小黑哥手機行事曆版 */
+        
+        /* 1. 日班系列 (使用舒服的天藍色底、深藍色字) */
+        .val-日班B班, .val-日B, .val-D1, .val-D2, .val-D3 { 
+            color: #1976d2; 
+            background: #e3f2fd; 
+        } 
+
+        /* 2. 夜E班系列 (使用內斂的紫色底、深紫字) */
+        .val-夜班E班, .val-夜E, .val-E1, .val-E2, .val-E3 { 
+            color: #6a1b9a; 
+            background: #f3e5f5; 
+        } 
+
+        /* 3. 夜B班系列 (使用清爽的草綠色底、深綠字) */
+        .val-夜班B班, .val-夜B, .val-C1, .val-C2, .val-C3 { 
+            color: #2e7d32; 
+            background: #e8f5e9; 
+        } 
+
+        /* 4. 休假/例假系列 (同步行事曆上溫和的粉紅色底、紅字) */
+        .val-例假, .val-休假, .val-休, .val-X { 
+            color: #c62828; 
+            background: #ffebee; 
+        }
+
+        /* 5. 事假系列 (同步 28 號那個顯眼的黃色底、深咖啡字) */
+        .val-事假 { 
+            color: #5d4037; 
+            background: #fff59d; 
+        }
         
         .is-holiday { background: #fff5f5; color: #e53935; } /* 假日欄位顏色 */
         
