@@ -16,16 +16,28 @@
         .month-ctrl { display: flex; align-items: center; gap: 15px; font-weight: bold; font-size: 1.2rem; }
         .btn-nav { padding: 6px 15px; cursor: pointer; background: #eee; border: 1px solid #ccc; border-radius: 5px; }
         
-        .table-container { width: 100%; overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .table-container { 
+            width: 100%; 
+            overflow-x: auto; 
+            background: white; 
+            border: 1px solid #666; 
+        }
         table { 
-    border-collapse: collapse; 
-    width: 100%; 
-    min-width: 2200px;    /* 從 1800px 加大到 2200px */
-    table-layout: fixed; 
-    border: 2px solid var(--border); 
-}
-        table { border-collapse: collapse; width: 100%; min-width: 1800px; table-layout: fixed; border: 2px solid var(--border); }
-        th { background: #f8f9fa; position: sticky; top: 0; z-index: 2; }
+            border-collapse: collapse; 
+            min-width: 2400px; /* ── 寬度從 2200px 加大到 2400px，讓每一天更寬敞 ── */
+            width: 100%; 
+            table-layout: fixed; 
+        }
+        th, td { 
+            border: 1px solid var(--border); 
+            padding: 8px 4px;  /* ── 內距加寬，讓字和邊框有呼吸空間，不易折行 ── */
+            text-align: center; 
+            font-size: 15px;   /* ── 字體稍微放大到 15px，看名字和班別更清楚 ── */
+            height: 48px;      /* ── 高度從 35px 放大到 48px，點擊輸入時超級好按 ── */
+        }
+        th { 
+            background: #e9ecef; 
+        }
         
         .sticky-left { position: sticky; left: 0; background: #fff !important; z-index: 10; border-right: 2px solid #bbb !important; width: 50px; }
         .sticky-left-2 { position: sticky; left: 50px; background: #fff !important; z-index: 10; border-right: 2px solid #bbb !important; width: 80px; }
